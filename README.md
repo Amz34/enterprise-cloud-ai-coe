@@ -5,6 +5,7 @@
 [![KSA Data Residency](https://img.shields.io/badge/KSA_Data_Residency-100%25_Compliant-success?style=flat-square&logo=oracle)](https://github.com/Amz34)
 [![Cybersecurity Standard](https://img.shields.io/badge/Compliance-NCA_ECC--1:2018-blue?style=flat-square)](https://github.com/Amz34)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Product Hunt](https://img.shields.io/badge/Product_Hunt-Ready_for_Launch-orange?style=flat-square&logo=producthunt)](https://www.producthunt.com)
 
 Architected and maintained by **Engr. Aamir Malik Zameer (SCE Licensed Engineer #317164)**  
 *Engineered for mission-critical industrial conglomerates in Saudi Arabia (aligned with Saudi Aramco, SABIC, SEC, and JAL International operational standards).*
