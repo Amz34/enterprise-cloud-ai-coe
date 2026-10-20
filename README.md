@@ -146,3 +146,7 @@ Jeddah / Dhahran, Kingdom of Saudi Arabia
 * **GitHub:** [github.com/Amz34](https://github.com/Amz34)  
 * **Live Portfolio:** [amz34.github.io](https://amz34.github.io)  
 * **Email:** shaikaamirmalik25@gmail.com  
+
+---
+
+Part of [my always-on agent stack](https://github.com/Amz34) · [Awesome Agent Infrastructure](https://github.com/Amz34/awesome-agent-infrastructure) (135 live-checked building blocks).
