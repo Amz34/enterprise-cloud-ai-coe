@@ -20,15 +20,15 @@ provider "oci" {
 resource "oci_core_vcn" "enterprise_vcn" {
   cidr_block     = "10.0.0.0/16"
   compartment_id = var.compartment_ocid
-  display_name   = "jal-enterprise-vcn-jeddah"
-  dns_label      = "jalvcn"
+  display_name   = "coe-enterprise-vcn-jeddah"
+  dns_label      = "coevcn"
 }
 
 # 2. Internet Gateway
 resource "oci_core_internet_gateway" "igw" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.enterprise_vcn.id
-  display_name   = "jal-internet-gateway"
+  display_name   = "coe-internet-gateway"
   enabled        = true
 }
 
@@ -36,7 +36,7 @@ resource "oci_core_internet_gateway" "igw" {
 resource "oci_core_route_table" "public_rt" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.enterprise_vcn.id
-  display_name   = "jal-public-route-table"
+  display_name   = "coe-public-route-table"
 
   route_rules {
     destination       = "0.0.0.0/0"
@@ -45,11 +45,11 @@ resource "oci_core_route_table" "public_rt" {
   }
 }
 
-# 4. Security List - Zero Trust & NCA ECC Aligned
+# 4. Security List - HTTPS and WireGuard ingress only (single public subnet skeleton)
 resource "oci_core_security_list" "secure_sl" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.enterprise_vcn.id
-  display_name   = "jal-security-list-nca-ecc"
+  display_name   = "coe-security-list"
 
   egress_security_rules {
     destination = "0.0.0.0/0"
@@ -83,7 +83,7 @@ resource "oci_core_subnet" "public_subnet" {
   cidr_block          = "10.0.1.0/24"
   compartment_id      = var.compartment_ocid
   vcn_id              = oci_core_vcn.enterprise_vcn.id
-  display_name        = "jal-public-app-subnet"
+  display_name        = "coe-public-app-subnet"
   dns_label           = "appsubnet"
   route_table_id      = oci_core_route_table.public_rt.id
   security_list_ids   = [oci_core_security_list.secure_sl.id]

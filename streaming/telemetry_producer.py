@@ -1,4 +1,4 @@
-"""High-velocity industrial IoT telemetry producer for JAL plant operations."""
+"""Synthetic industrial IoT telemetry producer for local testing."""
 import json
 import time
 from datetime import datetime, timezone
@@ -18,7 +18,7 @@ def generate_telemetry(sensor_id: str, temperature: float, pressure: float):
     return json.dumps(payload)
 
 if __name__ == "__main__":
-    print("=== Simulating JAL Industrial IoT Event Stream ===")
+    print("=== Simulating industrial IoT telemetry stream ===")
     for i in range(5):
         msg = generate_telemetry(f"SEN-DHR-{i:03d}", 78.4 + i * 0.5, 12.1 + (i % 2) * 0.3)
         print(f"Produced event -> {msg}")

@@ -1,4 +1,4 @@
-"""Sovereign In-Kingdom RAG Engine for Engineering Standards (Aramco/SABIC Aligned)."""
+"""Air-gapped lexical retrieval over small illustrative KSA standards fixtures."""
 import math
 import re
 

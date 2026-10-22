@@ -1,151 +1,168 @@
 # Enterprise Cloud & Sovereign AI Center of Excellence (CoE)
-### Industrial Architecture, Zero-SPOF Cloud Landing Zones & Sovereign MLOps Fabric
+### A runnable reference implementation: in-kingdom landing zone, industrial telemetry path, and local-only retrieval
 
 [![CI Architecture Verification](https://github.com/Amz34/enterprise-cloud-ai-coe/actions/workflows/ci.yml/badge.svg)](https://github.com/Amz34/enterprise-cloud-ai-coe/actions)
-[![KSA Data Residency](https://img.shields.io/badge/KSA_Data_Residency-100%25_Compliant-success?style=flat-square&logo=oracle)](https://github.com/Amz34)
-[![Cybersecurity Standard](https://img.shields.io/badge/Compliance-NCA_ECC--1:2018-blue?style=flat-square)](https://github.com/Amz34)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Product Hunt](https://img.shields.io/badge/Product_Hunt-Ready_for_Launch-orange?style=flat-square&logo=producthunt)](https://www.producthunt.com)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org)
 
-Architected and maintained by **Engr. Aamir Malik Zameer (SCE Licensed Engineer #317164)**  
-*Engineered for mission-critical industrial conglomerates in Saudi Arabia (aligned with Saudi Aramco, SABIC, SEC, and JAL International operational standards).*
+Most "sovereign AI architecture" repositories are slideware. This one is deliberately small: a working
+telemetry path, a retrieval path, an anomaly rule set, and a test suite that fails if any of them
+breaks. Every capability described below maps to a file in this repository and to an assertion that
+CI runs on every push.
+
+**Honest scope:** this repository is a *reference implementation and contract test*, not a deployed
+production stack. Section 5 lists exactly what is implemented and what is only a deployment target.
 
 ---
 
-## 🏛️ Executive Architecture Overview
+## 1. What is in this repository
 
-This repository houses the production reference architectures, Infrastructure-as-Code (IaC), real-time IoT event streaming pipelines, and sovereign AI/MLOps lakehouse engines designed to support Tier-1 industrial and EPC operations in the Kingdom of Saudi Arabia.
+| Path | What it actually does | Proof |
+|---|---|---|
+| `streaming/telemetry_producer.py` | Generates synthetic industrial sensor readings (temperature, pressure, vibration) as JSON lines | `tests/test_coe_stack.py::test_telemetry_streaming_and_lakehouse` |
+| `streaming/telemetry_consumer.py` | Ingests those records into a schema-checked SQLite sink and returns aggregate statistics | same test — asserts record count and non-zero averages |
+| `ai_mlops/sovereign_rag_engine.py` | Deterministic, air-gapped retrieval over a small in-repo document set, scored by cosine-style token overlap. No network calls, no external embedding service | `test_sovereign_rag_retrieval` |
+| `ai_mlops/predictive_maintenance.py` | Threshold-based equipment health scoring with per-metric alert reasons | `test_predictive_maintenance_health` |
+| `iac/main.tf`, `iac/variables.tf` | Terraform/OpenTofu definitions for an OCI VCN, internet gateway, route table, security list and public application subnet | reviewed in CI; not applied by CI |
+| `.github/workflows/ci.yml` | Runs the contract suite on Python 3.11 for every push and pull request | run history |
+
+The three retrieval fixtures (`SAES-L-105`, `SABIC-ENG-STD-402`, `NCA-ECC-1-2018`) are short
+illustrative excerpts written for this repository to exercise the matcher. They are not reproduced
+standard text and are not a corpus.
+
+---
+
+## 2. Architecture
+
+Solid tiers are implemented in this repository. Dashed tiers are the production deployment target
+and are **not** shipped here.
 
 ```mermaid
 flowchart TD
-    subgraph "Edge & Industrial Plant Sites (Dhahran / Jubail / Yanbu)"
-        Sensors["Plant IoT Telemetry (Vibration, Temp, Pressure)"]
-        SCADA["SCADA / Building Automation Systems"]
-        ERP["Enterprise ERP / CMMS (IBM Maximo, SAP)"]
+    subgraph Edge["Plant edge (target)"]
+        Sensors["IoT telemetry: vibration, temperature, pressure"]
+        SCADA["SCADA / building automation"]
+        ERP["ERP / CMMS"]
     end
 
-    subgraph "Hybrid Enterprise Ingestion & Streaming Fabric"
-        Redpanda["Redpanda / Kafka High-Throughput Stream (:9092)"]
-        EventWorker["Hermes Background Telemetry Workers"]
+    subgraph Ingest["Ingest"]
+        Producer["telemetry_producer.py (implemented: simulator)"]
+        Broker["Redpanda / Kafka single broker (target)"]
+        Consumer["telemetry_consumer.py (implemented)"]
     end
 
-    subgraph "Sovereign In-Kingdom Cloud Node (OCI me-jeddah-1)"
-        VCN["Multi-Tier Encrypted Virtual Cloud Network"]
-        Lakehouse["Columnar Analytical Lakehouse (DuckDB + Polars + PyArrow)"]
-        ObjectStore["Dual MinIO S3 Object Storage (:9000 / :9013)"]
-        Postgres["Enterprise PostgreSQL (:5433 / :5432)"]
+    subgraph Store["Storage"]
+        Sink["SQLite sink (implemented)"]
+        Lakehouse["DuckDB + Polars lakehouse (target)"]
+        ObjectStore["S3-compatible object store (target)"]
     end
 
-    subgraph "Sovereign AI & MLOps Engine (Zero External API Egress)"
-        Ollama["Local LLM Inference Engine (Qwen 2.5 / Llama 3.2)"]
-        Embedder["Dense Multilingual Embeddings (bge-m3)"]
-        VectorDB["ChromaDB Multi-Collection Store"]
-        RAG["Cryptographically Grounded RAG Pipeline"]
+    subgraph AI["Sovereign AI (no external egress)"]
+        RAG["sovereign_rag_engine.py (implemented: lexical retrieval)"]
+        Embed["bge-m3 dense embeddings (target)"]
+        VectorDB["ChromaDB collections (target)"]
+        Rules["predictive_maintenance.py (implemented: thresholds)"]
     end
 
-    subgraph "C-Suite & Operations Cockpit"
-        Dashboard["Predictive Maintenance & Energy KPI Portals"]
-        Alerts["Autonomous Anomaly Alerting & Failover Engine"]
+    subgraph Out["Consumers"]
+        Dashboard["KPI / maintenance dashboards (target)"]
+        Alerts["Anomaly alerting (implemented: rule output)"]
     end
 
-    Sensors --> Redpanda
-    SCADA --> Redpanda
-    ERP --> Postgres
-    Redpanda --> EventWorker
-    EventWorker --> Lakehouse
-    EventWorker --> ObjectStore
-    Lakehouse --> Embedder
-    Embedder --> VectorDB
-    VectorDB --> RAG
-    RAG --> Ollama
-    Ollama --> Dashboard
-    Lakehouse --> Alerts
+    Sensors --> Producer --> Broker --> Consumer --> Sink
+    Sink --> Lakehouse
+    Sink --> ObjectStore
+    Lakehouse --> Embed --> VectorDB --> RAG
+    RAG --> Dashboard
+    Sink --> Rules --> Alerts
+    ERP --> Lakehouse
+    SCADA --> Broker
 ```
 
 ---
 
-## ⚡ Key Highlights & Core Capabilities
+## 3. Quickstart
 
-### 1. Zero-SPOF Cloud Landing Zone (OCI `me-jeddah-1`)
-* **Multi-Fault-Domain Active-Passive Topology:** Engineered using OpenTofu/Terraform across Oracle Cloud Infrastructure Jeddah Region (`me-jeddah-1`).
-* **Automated Failover & Resilience:** Continuous bidirectional MinIO S3 replication and automated WireGuard mesh between companion instances.
-* **National Cybersecurity Compliance:** Aligned with Saudi **NCA ECC-1:2018** controls, featuring least-privilege pre-tool hooks, air-gapped cryptographic secret management (Vault/age/GPG), and strict ingress/egress firewalls.
-
-### 2. Sovereign In-Kingdom AI & MLOps Fabric
-* **Zero Data Leakage:** Eliminates reliance on public hyperscaler model APIs for sensitive industrial designs. Local inference via optimized runtimes (Ollama/vLLM) and `bge-m3` dense multilingual vector embeddings.
-* **Aramco / SABIC Engineering Standards RAG:** Ingests thousands of complex technical specification sheets, P&IDs, and maintenance logs into 15 distinct ChromaDB collections with sub-second retrieval latencies.
-* **Continuous Model Governance:** Automated drift monitoring, dataset versioning, and verification ledgers ensuring hallucination-free technical compliance answers.
-
-### 3. Industrial IoT Streaming & Columnar Lakehouse
-* **Micro-Footprint Event Streaming:** Single-broker Redpanda deployment capped strictly at 512MB RAM, delivering 10,000+ msg/sec throughput without exhausting host memory.
-* **Serverless Columnar Analytics:** Sub-second query execution across millions of telemetry records utilizing `duckdb`, `polars`, and `pyarrow`—cutting enterprise warehouse licensing costs to \$0.
-
----
-
-## 📂 Repository Layout
-
-```
-├── .github/workflows/ci.yml       # Automated CI/CD architecture test runner
-├── iac/
-│   ├── main.tf                    # OpenTofu/Terraform OCI me-jeddah-1 Landing Zone
-│   └── variables.tf               # Regional compute and network parameter definitions
-├── streaming/
-│   ├── docker-compose.yml         # Resource-capped Redpanda event streaming stack
-│   ├── telemetry_producer.py      # Industrial IoT sensor feed simulator
-│   └── telemetry_consumer.py      # Real-time columnar lakehouse ingestion worker
-├── ai_mlops/
-│   ├── sovereign_rag_engine.py    # Local bge-m3 embedding & ChromaDB retrieval pipeline
-│   └── predictive_maintenance.py  # Anomaly detection & equipment degradation model
-├── tests/
-│   └── test_coe_stack.py          # End-to-end verification and performance tests
-├── LICENSE                        # MIT License
-└── README.md                      # Architecture blueprint and documentation
-```
-
----
-
-## 🚀 Rapid Local Deployment
-
-### 1. Launch the Event Streaming Engine
 ```bash
-cd streaming
-docker compose up -d
-python3 telemetry_producer.py
-```
+git clone https://github.com/Amz34/enterprise-cloud-ai-coe.git
+cd enterprise-cloud-ai-coe
 
-### 2. Run the Columnar Lakehouse Verification
-```bash
+# Telemetry path: produce, then ingest and aggregate
+python3 streaming/telemetry_producer.py
 python3 streaming/telemetry_consumer.py
+
+# Retrieval and anomaly scoring
+python3 ai_mlops/sovereign_rag_engine.py
+python3 ai_mlops/predictive_maintenance.py
+
+# Contract suite (this is what CI runs)
+python3 tests/test_coe_stack.py
 ```
 
-### 3. Execute End-to-End Test Suite
+Optional broker, if you want the real thing instead of the simulator:
+
 ```bash
-pytest tests/test_coe_stack.py -v
+cd streaming && docker compose up -d   # single-broker Redpanda, memory-capped
 ```
 
 ---
 
-## 📊 Performance Benchmarks (Measured on Live ARM OCI Shape)
+## 4. What CI proves
 
-| Metric | Measured Baseline | Enterprise Target | Status |
-|---|---|---|---|
-| **Event Ingestion Latency** | **1.8 ms** | < 10 ms | ✅ PASS |
-| **Vector RAG Semantic Search** | **42 ms** (15 collections) | < 100 ms | ✅ PASS |
-| **Local LLM Token Throughput** | **28.4 tok/s** (Qwen 2.5 3B) | > 20 tok/s | ✅ PASS |
-| **SQL Columnar Join Speed** | **110 ms** (1M telemetry rows) | < 500 ms | ✅ PASS |
-| **Cloud Infrastructure Cost** | **$0 / month** (Always-Free Tenancy) | Budgeted | ✅ OPTIMAL |
+CI does not "verify the architecture" in the abstract. It asserts four concrete behaviours:
+
+1. Five simulated readings are ingested and the sink reports exactly five records with non-zero averages.
+2. A query for `piping material specifications` returns a match whose document id contains `ARAMCO-SAES-L-105`.
+3. A reading inside every threshold returns `status: NORMAL` with `health_score: 100.0`.
+4. A reading outside all three thresholds returns `status: ANOMALY_DETECTED`, three alert reasons, and a score below 50.
+
+If any of these stops holding, the build goes red. Anything the suite does not assert is a claim you
+should treat as unverified.
 
 ---
 
-## 👨‍💻 Architecture & Engineering Contact
+## 5. Implemented vs deployment target
 
-**Engr. Aamir Malik Zameer**  
-*SCE Licensed Engineer #317164 | Transferable Iqama*  
-Jeddah / Dhahran, Kingdom of Saudi Arabia  
-* **LinkedIn:** [linkedin.com/in/aamirzameer](https://linkedin.com/in/aamirzameer)  
-* **GitHub:** [github.com/Amz34](https://github.com/Amz34)  
-* **Live Portfolio:** [amz34.github.io](https://amz34.github.io)  
-* **Email:** shaikaamirmalik25@gmail.com  
+**Implemented and tested here**
+
+- Sensor record generation and JSON serialisation
+- Schema-checked ingestion with aggregate statistics
+- Deterministic lexical retrieval with `top_k` and score ranking
+- Threshold-based anomaly detection with explainable alert strings
+- OCI network definitions: VCN, internet gateway, route table, security list, public subnet
+
+**Deployment target — described, not implemented**
+
+- Streaming through Redpanda/Kafka (the compose file is provided; the Python path bypasses the broker)
+- Columnar lakehouse on DuckDB/Polars/PyArrow (the sink is SQLite)
+- Dense multilingual embeddings via `bge-m3` and ChromaDB collections (retrieval is lexical)
+- Local LLM inference via Ollama/vLLM
+- Private subnets, NAT gateway, multi-fault-domain compute, cross-region object replication (the
+  Terraform here defines one public subnet and no NAT)
+
+---
+
+## 6. Limitations
+
+- Retrieval is token overlap, not embeddings. It is deterministic and dependency-free, which makes it
+  testable; it is not a semantic search engine.
+- The anomaly thresholds (85 °C, 15 bar, 0.048 mm/s) are constants in one file. They are illustrative
+  operating envelopes, not values derived from any operator's equipment data.
+- The sink is in-memory SQLite. Persistence and concurrency behaviour under load are out of scope.
+- The Terraform defines a single-region network skeleton. It has not been applied against a live
+  tenancy by CI and carries no state backend configuration.
+- No authentication, authorisation or audit layer is included.
+
+---
+
+## 7. Contact
+
+**Engr. Aamir Malik Zameer**
+Jeddah / Dhahran, Kingdom of Saudi Arabia
+
+- LinkedIn: [linkedin.com/in/aamirzameer](https://linkedin.com/in/aamirzameer)
+- GitHub: [github.com/Amz34](https://github.com/Amz34)
+- Portfolio: [amz34.github.io](https://amz34.github.io)
 
 ---
 
